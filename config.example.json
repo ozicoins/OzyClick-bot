@@ -1,0 +1,24 @@
+{
+  "keyword": "uçak bileti",
+  "target_url": "",
+  "single_target": false,
+  "white_urls": ["benimsite.com"],
+  "capsolver_api": "",
+  "location": "Rastgele (Tüm Türkiye)",
+  "total_visits": 20,
+  "concurrency": 2,
+  "think_time": 20,
+  "cookies_dir": "cookies",
+
+  "_demografi": "Rakip kampanyanın hedef segmenti. Boş → filtre yok. Doluysa hedefe uymayan/unknown hesap elenir.",
+  "target_gender": "",
+  "target_age": "",
+
+  "_tarama": "python run.py --scan-demografi → tık yerine hesapların yaş+cinsiyetini Ad Center'dan okur (.meta.json).",
+  "scan_demografi": false,
+
+  "_sivt": "SIVT agregat tavanları (kalıcı click_history.json). Düşük-ve-yavaş > hacim: tutulan (iadesiz) tık oranını yükseltir. 0=sınırsız (önerilmez).",
+  "max_clicks_per_account_day": 5,
+  "max_clicks_per_ip_day": 15,
+  "target_cooldown_days": 2
+}
