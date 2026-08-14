@@ -267,9 +267,12 @@ class MainWindow(QMainWindow):
 
         row = QHBoxLayout()
         self.total = QSpinBox(); self.total.setRange(1, 100000); self.total.setValue(20)
+        self.total.setToolTip("TOPLAM kaç tık yapılacak (iş bitene kadar). Ör. 20 = 20 ziyaret/tık.")
         self.conc = QSpinBox(); self.conc.setRange(1, 4); self.conc.setValue(2)   # headful → düşük tut (#25)
+        self.conc.setToolTip("AYNI ANDA kaç tarayıcı çalışsın (paralel).\nMax 4 (headful GPU'suz PC'de düşük tut). 2-3 önerilir.")
         self.think = QSpinBox(); self.think.setRange(3, 600); self.think.setValue(20)
-        for lab, w in [("Ziyaret", self.total), ("Pencere", self.conc), ("Bekleme(sn)", self.think)]:
+        self.think.setToolTip("İki tık arasında beklenecek saniye (insan gibi; düşük-yavaş = güvenli).")
+        for lab, w in [("Toplam tık", self.total), ("Aynı anda (paralel)", self.conc), ("Tık arası (sn)", self.think)]:
             col = QVBoxLayout()
             l = QLabel(lab); l.setProperty("class", "lbl"); col.addWidget(l); col.addWidget(w)
             row.addLayout(col)
