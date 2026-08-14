@@ -7,6 +7,7 @@ gerçek render, per-profil de-korelasyon, WebGL/deviceMemory spoof, davranış, 
 """
 import os
 import csv
+import shutil
 import sys
 import time
 import asyncio
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from clicker_core import (
     JobConfig, discover_cookie_files, run_click_job, scan_demographics_job, Stats, TURKISH_CITIES,
+    _parse_proxy,
 )
 import demographics as demo_mod
 
@@ -224,11 +226,12 @@ class MainWindow(QMainWindow):
         add("ANAHTAR KELİME *", self.keyword)
 
         self.target = QLineEdit()
-        self.target.setPlaceholderText("kelime-only'de boş · tek-hedefte zorunlu (site.com)")
         add("HEDEF URL", self.target)
 
-        self.single = QCheckBox("Tek hedef modu (sadece hedef domaine tıkla)")
+        self.single = QCheckBox("Tek hedef modu (sadece bu URL'nin reklamına tıkla)")
+        self.single.toggled.connect(self._on_single_toggled)
         lg.addWidget(self.single, r, 0, 1, 2); r += 1
+        self._on_single_toggled(self.single.isChecked())   # başlangıç durumu (URL alanını ayarla)
 
         self.white = QTextEdit()
         self.white.setPlaceholderText("benimsite.com\n# domain yeter → tüm alt-alan+path korunur")
@@ -272,33 +275,48 @@ class MainWindow(QMainWindow):
             row.addLayout(col)
         lg.addLayout(row, r, 0, 1, 2); r += 1
 
-        # SIVT günlük tavanlar (kalıcı defter → iade-önleyici; düşük-ve-yavaş)
+        # Günlük güvenlik limiti — Google 'çok tık' (geçersiz-tık/SIVT) yakalamasın; düşük-ve-yavaş = tutulan tık.
         row2 = QHBoxLayout()
         self.cap_acct = QSpinBox(); self.cap_acct.setRange(0, 1000); self.cap_acct.setValue(5)
+        self.cap_acct.setToolTip("Bir HESAP günde en fazla kaç kez tıklasın.\nDüşük tut (5-10) → Google 'bu hesap çok tıklıyor' demez.\n0 = sınırsız (riskli).")
         self.cap_ip = QSpinBox(); self.cap_ip.setRange(0, 10000); self.cap_ip.setValue(15)
-        for lab, w in [("Hesap/gün (0=∞)", self.cap_acct), ("IP/gün (0=∞)", self.cap_ip)]:
+        self.cap_ip.setToolTip("Bir PROXY/IP günde en fazla kaç kez tıklasın.\nDüşük tut (10-20) → Google 'bu IP çok tıklıyor' demez.\n0 = sınırsız (riskli).")
+        for lab, w in [("Bir hesap · günde max tık", self.cap_acct), ("Bir proxy · günde max tık", self.cap_ip)]:
             col = QVBoxLayout()
             l = QLabel(lab); l.setProperty("class", "lbl"); col.addWidget(l); col.addWidget(w)
             row2.addLayout(col)
-        lab = QLabel("SIVT GÜNLÜK TAVAN (iade-önleyici)"); lab.setProperty("class", "lbl")
+        lab = QLabel("GÜNLÜK GÜVENLİK LİMİTİ  —  Google 'çok tık' yakalamasın (az = güvenli)")
+        lab.setProperty("class", "lbl")
+        lab.setToolTip("Aynı hesabı/IP'yi günde çok kez tıklatmak Google'ın geçersiz-tık filtresini (SIVT) tetikler ve\n"
+                       "tıklar sonradan İADE olur. Bu iki limit günlük tık sayısını düşük tutar → 'düşük ve yavaş' = tutulan tık.")
         lg.addWidget(lab, r, 0, 1, 2); r += 1
         lg.addLayout(row2, r, 0, 1, 2); r += 1
 
-        # çerez klasörü
+        # çerezler: KLASÖR seç VEYA tek tek DOSYA ekle
         ck = QHBoxLayout()
         self.cookie_lbl = QLabel("—")
         self.cookie_lbl.setProperty("class", "lbl")
-        btn_ck = QPushButton("Çerez Klasörü")
+        btn_ck = QPushButton("📁 Klasör")
+        btn_ck.setToolTip("Çerez .json dosyalarının olduğu KLASÖRÜ seç")
         btn_ck.clicked.connect(self.pick_cookies)
-        ck.addWidget(btn_ck); ck.addWidget(self.cookie_lbl, 1)
-        lab = QLabel("ÇEREZLER"); lab.setProperty("class", "lbl")
+        btn_cf = QPushButton("➕ Dosya Ekle")
+        btn_cf.setToolTip("Tek tek çerez .json dosyası seç → çerez klasörüne kopyalanır")
+        btn_cf.clicked.connect(self.add_cookie_files)
+        ck.addWidget(btn_ck); ck.addWidget(btn_cf); ck.addWidget(self.cookie_lbl, 1)
+        lab = QLabel("ÇEREZLER  (SADQ panelinden indir → klasör seç ya da dosya ekle)"); lab.setProperty("class", "lbl")
         lg.addWidget(lab, r, 0, 1, 2); r += 1
         lg.addLayout(ck, r, 0, 1, 2); r += 1
 
         self.proxies = QTextEdit()
-        self.proxies.setPlaceholderText("boş → her çerez kendi doğum proxy'siyle\nkullanici:parola@host:port")
-        self.proxies.setFixedHeight(48)
-        add("PROXY (satır satır, opsiyonel)", self.proxies)
+        self.proxies.setPlaceholderText(
+            "Her satıra 1 proxy:\n"
+            "  ip:port                    →  1.2.3.4:8080\n"
+            "  kullanıcı:parola@ip:port   →  user:pass@1.2.3.4:8080\n"
+            "  [IPv6]:port                →  [2a01:4f8::1]:8080\n"
+            "Boş bırak → her çerez KENDİ doğum proxy'siyle çıkar (önerilen)."
+        )
+        self.proxies.setFixedHeight(78)
+        add("PROXY  (satır satır · ip:port  ya da  kullanıcı:parola@ip:port · opsiyonel)", self.proxies)
 
         lg.setRowStretch(r, 1)
         body.addWidget(left, 0)
@@ -348,6 +366,37 @@ class MainWindow(QMainWindow):
             self.cookies_dir = d
             self.refresh_cookies()
 
+    def add_cookie_files(self):
+        # Tek tek çerez .json dosyası seç → çerez klasörüne kopyala (klasör seçmeye gerek kalmadan).
+        files, _ = QFileDialog.getOpenFileNames(self, "Çerez Dosyaları Seç", self.cookies_dir, "Çerez dosyası (*.json)")
+        if not files:
+            return
+        try:
+            os.makedirs(self.cookies_dir, exist_ok=True)
+        except Exception:
+            pass
+        added = 0
+        for f in files:
+            try:
+                dst = os.path.join(self.cookies_dir, os.path.basename(f))
+                if os.path.abspath(f) != os.path.abspath(dst):
+                    shutil.copy2(f, dst)
+                added += 1
+            except Exception as e:
+                self._log(f"⚠️ kopyalanamadı: {os.path.basename(f)} ({str(e)[:40]})")
+        self._log(f"➕ {added} çerez dosyası eklendi → {self.cookies_dir}")
+        self.refresh_cookies()
+
+    def _on_single_toggled(self, on):
+        # Tek-hedef AÇIK → HEDEF URL alanı aktif + odak (bu URL'nin reklamına tıklanır).
+        # KAPALI (kelime-only) → URL alanı pasif/soluk (kullanılmaz; whitelist DIŞI rakip reklama tıklanır).
+        self.target.setEnabled(on)
+        if on:
+            self.target.setPlaceholderText("bu sitenin reklamına tıkla  →  site.com")
+            self.target.setFocus()
+        else:
+            self.target.setPlaceholderText("kelime-only modunda gerekmez (rakip reklama tıklanır)")
+
     def refresh_cookies(self):
         n = len(discover_cookie_files([self.cookies_dir]))
         self.cookie_lbl.setText(f"{n} çerez · {self.cookies_dir}")
@@ -396,6 +445,16 @@ class MainWindow(QMainWindow):
             return
         wl = [x.strip() for x in self.white.toPlainText().replace(",", "\n").splitlines() if x.strip() and not x.startswith("#")]
         proxies = [x.strip() for x in self.proxies.toPlainText().splitlines() if x.strip() and not x.startswith("#")]
+        # Proxy biçim ön-kontrolü: çözülemeyen satırları uyar (biçim: ip:port / kullanıcı:parola@ip:port / [IPv6]:port).
+        bad = [p for p in proxies if _parse_proxy(p) is None]
+        if bad:
+            if QMessageBox.warning(
+                self, "Proxy biçimi",
+                f"{len(bad)} proxy satırı çözülemedi.\nDoğru biçim: ip:port  ya da  kullanıcı:parola@ip:port\n"
+                f"Hatalı örnek: {bad[0][:48]}\n\nBu satırlar ATLANIR (o ziyaretler güvenle atlanır, gerçek-IP sızmaz). Yine de başlansın mı?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            ) != QMessageBox.Yes:
+                return
         loc = self.location.currentText()
         if loc.startswith("Yok"):
             loc = ""       # GPS kapalı → boş geç (aşağıda 'loc or Rastgele' ile EZİLMEMELİ)
