@@ -1,6 +1,7 @@
 # Sırlar / veri — repoya GİRMEZ
 proxies.txt
 config.json
+gui_settings.json
 cookies/
 *.cookies
 *.log

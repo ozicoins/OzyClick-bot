@@ -1181,7 +1181,10 @@ class AccountPool:
             cand.append(f)
         if not cand:
             return None
-        f = random.choice(cand)
+        # ROUND-ROBIN (LRU): en UZUN SÜREDİR kullanılmayan çerezi seç (last en küçük; hiç kullanılmamış=0
+        # en önce). Böylece TÜM farklı çerezler birer kez kullanılmadan hiçbiri tekrar kullanılmaz →
+        # üst üste aynı çerezle tık (Google iade/geçersiz sayar) ENGELLENIR. Bir tur biter, baştan döner.
+        f = min(cand, key=lambda x: self.state.get(x, {}).get("last", 0.0))
         self._s(f)["inflight"] = True
         return f
 

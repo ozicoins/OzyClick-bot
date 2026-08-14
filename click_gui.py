@@ -7,6 +7,7 @@ gerçek render, per-profil de-korelasyon, WebGL/deviceMemory spoof, davranış, 
 """
 import os
 import csv
+import json
 import shutil
 import sys
 import time
@@ -17,6 +18,7 @@ os.environ.setdefault("CLICKER_ENGINE", "vanilla")
 os.environ.setdefault("CLICKER_HEADFUL", "1")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SETTINGS_FILE = os.path.join(HERE, "gui_settings.json")   # tüm alanlar burada kalır (durmadan yazma yok)
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
@@ -160,21 +162,54 @@ class ScanThread(QThread):
 
 # ============================== ANA PENCERE ==============================
 DARK = """
-QWidget { background:#0f141a; color:#e3ebf3; font-family:'Segoe UI','SF Pro Text',Arial; font-size:13px; }
-QLabel#h1 { color:#2ee66b; font-size:18px; font-weight:800; }
-QLabel.lbl { color:#8a97a6; font-size:11px; }
+* { outline:none; }
+QWidget { background:#0a0e15; color:#e6edf5; font-family:'Segoe UI','SF Pro Text',Arial; font-size:13px; }
+QMainWindow, QDialog { background:#0a0e15; }
+QLabel#h1 { color:#e6b450; font-size:19px; font-weight:800; letter-spacing:0.5px; }
+QLabel.lbl { color:#7d8b9c; font-size:11px; font-weight:600; letter-spacing:0.3px; }
+
 QLineEdit, QTextEdit, QComboBox, QSpinBox {
-    background:#0a0f14; border:1px solid #27333f; border-radius:7px; padding:6px 8px; color:#e3ebf3;
+    background:#070b11; border:1px solid #1e2a38; border-radius:8px; padding:7px 9px; color:#e6edf5;
+    selection-background-color:#37c9b0; selection-color:#04120f;
 }
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus { border:1px solid #37c9b0; }
-QFrame#card { background:#141b24; border:1px solid #27333f; border-radius:12px; }
-QPushButton { background:#1b2531; border:1px solid #27333f; border-radius:9px; padding:9px 16px; font-weight:700; }
-QPushButton:hover { border:1px solid #37c9b0; }
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus { border:1px solid #37c9b0; background:#080d14; }
+QLineEdit:disabled, QComboBox:disabled, QTextEdit:disabled { color:#4a5666; background:#0b1119; border:1px solid #16202b; }
+
+/* Açılır menü (combo) — arkası SİYAH (beyaz değil) */
+QComboBox::drop-down { border:none; width:22px; }
+QComboBox::down-arrow { image:none; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid #7d8b9c; margin-right:8px; }
+QComboBox QAbstractItemView {
+    background:#0a0e15; color:#e6edf5; border:1px solid #1e2a38; border-radius:8px;
+    selection-background-color:#15303a; selection-color:#37c9b0; outline:none; padding:4px;
+}
+QSpinBox::up-button, QSpinBox::down-button { width:18px; background:#111a25; border:none; border-radius:3px; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover { background:#1a2735; }
+
+QFrame#card { background:#0e151f; border:1px solid #1e2a38; border-radius:14px; }
+
+QPushButton { background:#131c28; border:1px solid #24303e; border-radius:10px; padding:9px 16px; font-weight:700; color:#cdd8e4; }
+QPushButton:hover { border:1px solid #37c9b0; color:#e6edf5; }
+QPushButton:pressed { background:#0e1621; }
 QPushButton#start { background:#22c55e; color:#04120f; border:none; }
 QPushButton#start:hover { background:#2ee66b; }
-QPushButton#stop { background:#3a1f22; color:#ff6b6b; border:1px solid #6b2b2b; }
-QCheckBox { color:#e3ebf3; }
-QTextEdit#log { background:#05080b; font-family:'SF Mono','Consolas',monospace; font-size:12px; }
+QPushButton#stop { background:#2a1518; color:#ff7b7b; border:1px solid #5c2b2f; }
+QPushButton#stop:hover { background:#3a1d20; }
+
+QCheckBox { color:#cdd8e4; spacing:8px; }
+QCheckBox::indicator { width:18px; height:18px; border:1px solid #24303e; border-radius:5px; background:#070b11; }
+QCheckBox::indicator:checked { background:#37c9b0; border:1px solid #37c9b0; }
+
+QTextEdit#log { background:#05080c; border:1px solid #14202c; font-family:'SF Mono','Consolas','Courier New',monospace; font-size:12px; color:#cbd6e2; }
+
+QToolTip { background:#0e151f; color:#e6edf5; border:1px solid #37c9b0; border-radius:6px; padding:6px 8px; font-size:12px; }
+
+QScrollBar:vertical { background:transparent; width:10px; margin:2px; }
+QScrollBar::handle:vertical { background:#24303e; border-radius:5px; min-height:24px; }
+QScrollBar::handle:vertical:hover { background:#37c9b0; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }
+QScrollBar:horizontal { background:transparent; height:10px; margin:2px; }
+QScrollBar::handle:horizontal { background:#24303e; border-radius:5px; min-width:24px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width:0; }
 """
 
 
@@ -268,8 +303,10 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         self.total = QSpinBox(); self.total.setRange(1, 100000); self.total.setValue(20)
         self.total.setToolTip("TOPLAM kaç tık yapılacak (iş bitene kadar). Ör. 20 = 20 ziyaret/tık.")
-        self.conc = QSpinBox(); self.conc.setRange(1, 4); self.conc.setValue(2)   # headful → düşük tut (#25)
-        self.conc.setToolTip("AYNI ANDA kaç tarayıcı çalışsın (paralel).\nMax 4 (headful GPU'suz PC'de düşük tut). 2-3 önerilir.")
+        self.conc = QSpinBox(); self.conc.setRange(1, 12); self.conc.setValue(6)   # GPU'lu PC (RTX 2060) → 6-8 rahat
+        self.conc.setToolTip("AYNI ANDA kaç tarayıcı çalışsın (paralel).\n"
+                             "GPU'lu PC (RTX 2060): 6-8 rahat çalışır (16GB RAM ile).\n"
+                             "Kasarsa / RAM yetmezse düşür. GPU'suz laptop'ta 2-3 tut.")
         self.think = QSpinBox(); self.think.setRange(3, 600); self.think.setValue(20)
         self.think.setToolTip("İki tık arasında beklenecek saniye (insan gibi; düşük-yavaş = güvenli).")
         for lab, w in [("Toplam tık", self.total), ("Aynı anda (paralel)", self.conc), ("Tık arası (sn)", self.think)]:
@@ -359,8 +396,9 @@ class MainWindow(QMainWindow):
 
         body.addLayout(right, 1)
 
+        self._load_settings()          # kayıtlı ayarları geri yükle (durmadan yazma yok)
         self.refresh_cookies()
-        self._log("Hazır. Çerez klasörünü seç, kelime gir, Başlat.")
+        self._log("Hazır. Ayarların hatırlandı. Çerez ekle, kelime gir, Başlat.")
 
     # ---- yardımcılar ----
     def pick_cookies(self):
@@ -403,6 +441,57 @@ class MainWindow(QMainWindow):
     def refresh_cookies(self):
         n = len(discover_cookie_files([self.cookies_dir]))
         self.cookie_lbl.setText(f"{n} çerez · {self.cookies_dir}")
+
+    # ---- ayar kalıcılığı (durmadan yazma yok) ----
+    def _collect_settings(self):
+        return {
+            "keyword": self.keyword.text(), "target": self.target.text(),
+            "single": self.single.isChecked(), "white": self.white.toPlainText(),
+            "capsolver": self.capsolver.text(), "location": self.location.currentText(),
+            "gender": self.gender.currentText(), "age": self.age.text(),
+            "total": self.total.value(), "conc": self.conc.value(), "think": self.think.value(),
+            "cap_acct": self.cap_acct.value(), "cap_ip": self.cap_ip.value(),
+            "cookies_dir": self.cookies_dir, "proxies": self.proxies.toPlainText(),
+        }
+
+    def _apply_settings(self, d):
+        try:
+            self.keyword.setText(d.get("keyword", ""))
+            self.target.setText(d.get("target", ""))
+            self.single.setChecked(bool(d.get("single", False)))   # → _on_single_toggled tetiklenir
+            self.white.setPlainText(d.get("white", ""))
+            self.capsolver.setText(d.get("capsolver", ""))
+            if d.get("location"):
+                self.location.setCurrentText(d["location"])
+            if d.get("gender"):
+                self.gender.setCurrentText(d["gender"])
+            self.age.setText(d.get("age", ""))
+            for key, w in (("total", self.total), ("conc", self.conc), ("think", self.think),
+                           ("cap_acct", self.cap_acct), ("cap_ip", self.cap_ip)):
+                v = d.get(key)
+                if isinstance(v, int):
+                    w.setValue(v)
+            cd = d.get("cookies_dir")
+            if cd and os.path.isdir(cd):
+                self.cookies_dir = cd
+            self.proxies.setPlainText(d.get("proxies", ""))
+        except Exception:
+            pass
+
+    def _save_settings(self):
+        try:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(self._collect_settings(), f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _load_settings(self):
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    self._apply_settings(json.load(f))
+        except Exception:
+            pass
 
     def _log(self, m):
         from time import strftime
@@ -463,6 +552,7 @@ class MainWindow(QMainWindow):
             loc = ""       # GPS kapalı → boş geç (aşağıda 'loc or Rastgele' ile EZİLMEMELİ)
         tgender = demo_mod.normalize_target_gender(self.gender.currentText())
         tages = demo_mod.parse_target_ages(self.age.text().strip())
+        self._save_settings()          # başlatınca ayarları kaydet (bir dahaki açılışta hazır gelir)
         cfg = JobConfig(
             keyword=keyword, target_url=target, single_target=single, white_urls=wl,
             capsolver_api=self.capsolver.text().strip(), location=loc,   # "Yok"→"" (kapalı) korunur
@@ -551,6 +641,7 @@ class MainWindow(QMainWindow):
         self._csv_f = None
 
     def closeEvent(self, event):
+        self._save_settings()          # kapanışta ayarları kaydet (bir dahaki açılışta hatırlanır)
         # Non-blocking-ish: durdur, 4s bekle, bitmezse zorla sonlandır (GUI donmasın #12).
         for th in (self.bot, self.scan):
             if th and th.isRunning():
