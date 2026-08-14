@@ -589,7 +589,7 @@ async def google_search_behavior(page, task_id, log_callback, target_domain, whi
                     return dom, first
             return "", ""
 
-        async def _click(al, why):
+        async def _click(al, why, expect_dom="", _wl=None):
             try:
                 if not await al.is_visible():
                     return False
@@ -638,6 +638,19 @@ async def google_search_behavior(page, task_id, log_callback, target_domain, whi
                           and "chrome-error" not in cur and "sorry" not in cur
                           and (landing is not page or cur != before_url)
                           and "google." not in host)
+                # YANLIŞ-REKLAM KORUMASI (kullanıcı: kesinlikle yanlış reklama tıklama olmasın):
+                #  • tek-hedef → iniş domaini HEDEF (ya da alt-domaini) OLMALI; başka reklama gidildiyse GEÇERSİZ.
+                #  • kelime-only → iniş domaini WHITELIST'te (kendi/beyaz) OLMAMALI; kendine gidildiyse GEÇERSİZ.
+                # (tap yanlış elemana kayıp başka yere gittiyse başarı SAYILMAZ.)
+                _hostl = host.replace("www.", "").lower()
+                if landed and expect_dom:
+                    ed = expect_dom.lower()
+                    if not (_hostl == ed or _hostl.endswith("." + ed)):
+                        log_callback(f"⛔ (Bot {task_id}) YANLIŞ REKLAM! beklenen '{ed}' → gidilen '{_hostl}' — GEÇERSİZ, sayılmadı")
+                        landed = False
+                if landed and _wl and is_white_url(_hostl, _wl):
+                    log_callback(f"⛔ (Bot {task_id}) KENDİ/beyaz domaine gidildi ({_hostl}) — GEÇERSİZ, sayılmadı")
+                    landed = False
                 if not landed:
                     log_callback(f"⚠️ (Bot {task_id}) navigasyon YOK/SERP'te kaldı — GEÇERSİZ tık ({why})")
                     if landing is not page:
@@ -688,7 +701,7 @@ async def google_search_behavior(page, task_id, log_callback, target_domain, whi
                     if is_white_url(dom, white_urls) or (url and is_white_url(url, white_urls)):
                         log_callback(f"🚫 (Bot {task_id}) Hedef whitelist'te — TIKLAMA İPTAL")
                         return "__wl_skip__"    # #16: fail DEĞİL (karantina/devre-kesici sürüklemesin)
-                    if await _click(al, f"tek-hedef: {dom}"):
+                    if await _click(al, f"tek-hedef: {dom}", expect_dom=td):
                         return dom
             log_callback(f"❌ Hedef domain reklamı bulunamadı (Bot {task_id})")
             return ""
@@ -728,7 +741,7 @@ async def google_search_behavior(page, task_id, log_callback, target_domain, whi
             fresh = await _fresh_handle(dom)
             if fresh is None:
                 continue
-            if await _click(fresh, f"rakip #{i + 1}: {dom}"):
+            if await _click(fresh, f"rakip #{i + 1}: {dom}", _wl=white_urls):
                 return dom
         log_callback(f"❌ Hiçbir rakip reklam GEÇERLİ tıklanamadı (Bot {task_id})")
         return ""
