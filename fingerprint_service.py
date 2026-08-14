@@ -61,7 +61,8 @@ MOBILE_DEVICES = [
 ]
 
 # Güncel Chrome ana sürümleri (UA + Client Hints AYNI sürümü kullanır → tutarlı).
-_ANDROID_CHROME = [124, 125, 126, 127, 128, 129, 130, 131]
+# ⚠️ BAYAT UA = TELL → ~AYLIK BUMP. Son güncelleme 2026-08-14 (stabil=152). SADQ/clicker ile aynı tut.
+_ANDROID_CHROME = [149, 150, 151, 152]
 
 
 @dataclass
@@ -83,7 +84,7 @@ class BrowserFingerprint:
     color_scheme: str = "light"
     model: str = "SM-S911B"
     os_version: str = "14"
-    browser_version: str = "131"   # Chrome ana sürüm (UA + userAgentData + Sec-CH-UA aynı)
+    browser_version: str = "152"   # Chrome ana sürüm (UA + userAgentData + Sec-CH-UA aynı) — fallback default, güncel tut
     canvas_noise: int = 1          # ESKİ zayıf gürültü (seed'siz çerezlerde geriye-uyum için tutulur)
     noise_seed: int = 0            # PER-PROFİL büyük seed → canvas/audio/webgl DE-KORELASYON (crack #1);
                                    # 0 = eski çerez (zayıf canvas_noise'a düşer, doğumuna uyumlu)
@@ -299,7 +300,7 @@ class FingerprintService:
         cores = fp.hardware_concurrency if fp else 8
         model = fp.model if fp else "SM-S911B"
         osv = fp.os_version if fp else "14"
-        cver = fp.browser_version if fp else "131"
+        cver = fp.browser_version if fp else "152"
         cnoise = fp.canvas_noise if fp else 1
         nseed = (fp.noise_seed if fp else 0) or 0
         vw = (fp.viewport or {}).get("width", 390) if fp else 390

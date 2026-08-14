@@ -32,12 +32,13 @@ _HISTORY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "click_
 MAX_CONCURRENCY = int(os.environ.get("CLICKER_MAX_CONCURRENCY", "12"))
 
 # Yedek UA havuzu — SADECE çerez dosyasında fingerprint/UA YOKSA kullanılır (Android/Chromium).
+# ⚠️ Yalnız UA'sız çerez için FALLBACK. BAYAT UA = tell → güncel tut. Son güncelleme 2026-08-14 (stabil=152).
 USER_AGENTS = [
-    "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 14; 2211133G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Linux; Android 14; CPH2449) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 15; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 14; 2211133G) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 15; CPH2449) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
 ]
 
 TURKISH_CITIES = [
@@ -765,7 +766,7 @@ def _fp_from_stored(fp):
     uygulanır. YENİDEN üretme YOK (birth match bozulur, oturum ölür)."""
     import re
     ua = (fp or {}).get("user_agent", "") or ""
-    cver = (re.search(r"Chrome/(\d+)", ua) or [None, "131"])[1] if "Chrome/" in ua else "131"
+    cver = (re.search(r"Chrome/(\d+)", ua) or [None, "152"])[1] if "Chrome/" in ua else "152"
     mm = re.search(r"Android \d+; ([^)]+)\)", ua)
     av = re.search(r"Android (\d+)", ua)
     fp = fp or {}
